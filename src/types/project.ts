@@ -1,7 +1,7 @@
 export type ProjectStatus = 'active' | 'completed' | 'on-hold' | 'cancelled';
 
 export interface Project {
-  id: string;
+  id: number;
   name: string;
   client: string;
   status: ProjectStatus;

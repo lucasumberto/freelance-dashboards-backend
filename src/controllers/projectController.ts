@@ -1,16 +1,18 @@
 import { Request, Response } from 'express';
-import { Project, CreateProjectDTO, UpdateProjectDTO } from '../types/project';
+import { CreateProjectDTO, UpdateProjectDTO } from '../types/project';
+import prisma from '../config/prisma';
 
-// Armazenamento em memória (substituir por banco de dados depois)
-let projects: Project[] = [];
-
-export const getAllProjects = (req: Request, res: Response): void => {
+export const getAllProjects = async (req: Request, res: Response): Promise<void> => {
+  const projects = await prisma.project.findMany();
   res.json(projects);
 };
 
-export const getProjectById = (req: Request, res: Response): void => {
+export const getProjectById = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const project = projects.find(p => p.id === id);
+  const projectId = parseInt(Array.isArray(id) ? id[0] : id, 10);
+  const project = await prisma.project.findUnique({
+    where: { id: projectId }
+  });
   
   if (!project) {
     res.status(404).json({ error: 'Projeto não encontrado' });
@@ -20,56 +22,54 @@ export const getProjectById = (req: Request, res: Response): void => {
   res.json(project);
 };
 
-export const createProject = (req: Request, res: Response): void => {
+export const createProject = async (req: Request, res: Response): Promise<void> => {
   const data: CreateProjectDTO = req.body;
   
-  const newProject: Project = {
-    id: crypto.randomUUID(),
-    name: data.name,
-    client: data.client,
-    status: data.status,
-    startDate: data.startDate,
-    endDate: data.endDate || null,
-    budget: data.budget,
-    actualCost: data.actualCost || 0,
-    progress: data.progress || 0,
-    description: data.description,
-  };
+  const newProject = await prisma.project.create({
+    data: {
+      name: data.name,
+      client: data.client,
+      status: data.status,
+      startDate: data.startDate,
+      endDate: data.endDate || null,
+      budget: data.budget,
+      actualCost: data.actualCost || 0,
+      progress: data.progress || 0,
+      description: data.description,
+    }
+  });
   
-  projects.push(newProject);
   res.status(201).json(newProject);
 };
 
-export const updateProject = (req: Request, res: Response): void => {
+export const updateProject = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
+  const projectId = parseInt(Array.isArray(id) ? id[0] : id, 10);
   const data: UpdateProjectDTO = req.body;
   
-  const projectIndex = projects.findIndex(p => p.id === id);
-  
-  if (projectIndex === -1) {
+  try {
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data
+    });
+    
+    res.json(updatedProject);
+  } catch (error) {
     res.status(404).json({ error: 'Projeto não encontrado' });
-    return;
   }
-  
-  const updatedProject: Project = {
-    ...projects[projectIndex],
-    ...data,
-  };
-  
-  projects[projectIndex] = updatedProject;
-  res.json(updatedProject);
 };
 
-export const deleteProject = (req: Request, res: Response): void => {
+export const deleteProject = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
+  const projectId = parseInt(Array.isArray(id) ? id[0] : id, 10);
   
-  const projectIndex = projects.findIndex(p => p.id === id);
-  
-  if (projectIndex === -1) {
+  try {
+    await prisma.project.delete({
+      where: { id: projectId }
+    });
+    
+    res.status(204).send();
+  } catch (error) {
     res.status(404).json({ error: 'Projeto não encontrado' });
-    return;
   }
-  
-  projects.splice(projectIndex, 1);
-  res.status(204).send();
 };
