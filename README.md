@@ -63,7 +63,12 @@ Edite o arquivo `.env` com suas configurações do PostgreSQL.
 npx prisma migrate dev
 ```
 
-5. Inicie o servidor em desenvolvimento:
+5. (Opcional) Popule o banco com dados de exemplo:
+```bash
+npx prisma db seed
+```
+
+6. Inicie o servidor em desenvolvimento:
 ```bash
 npm run dev
 ```
@@ -103,16 +108,23 @@ src/
 │   └── prisma.ts       # Cliente Prisma
 ├── controllers/        # Lógica de negócio
 │   ├── clientController.ts
+│   ├── dashboardController.ts
 │   ├── financeController.ts
 │   └── projectController.ts
 ├── routes/            # Definição de rotas
 │   ├── clientRoutes.ts
+│   ├── dashboardRoutes.ts
 │   ├── financeRoutes.ts
 │   └── projectRoutes.ts
 └── types/             # Interfaces TypeScript
     ├── client.ts
+    ├── dashboard.ts
     ├── finance.ts
     └── project.ts
+prisma/
+├── schema.prisma      # Modelos do banco
+├── migrations/        # Histórico de migrações
+└── seed.ts            # Dados de exemplo
 ```
 
 ## 🔌 API Endpoints
@@ -135,6 +147,9 @@ src/
 - `GET /finances/summary` - Resumo financeiro
 - `GET /finances/transactions` - Listar transações
 - `GET /finances/revenue` - Receitas mensais
+
+### Dashboard (`/dashboard`)
+- `GET /dashboard/stats` - Variação de receita, lucro, projetos e clientes em relação ao mês anterior
 
 ## 🚧 Melhorias Futuras
 

@@ -38,11 +38,15 @@ model Transaction {
 
 model Revenue {
   id        Int      @id @default(autoincrement())
-  month     String
-  amount    Float
-  projected Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  month       String
+  year        Int
+  monthNumber Int
+  amount      Float
+  projected   Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([year, monthNumber])
 }
 
 model Client {

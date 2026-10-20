@@ -2,71 +2,62 @@ import { Request, Response } from 'express';
 import { DashboardStats } from '../types/dashboard';
 import prisma from '../config/prisma';
 
+// Chave "YYYY-MM" usada para comparar com as datas das transações ("YYYY-MM-DD").
+// Comparar o texto evita o new Date('YYYY-MM-DD'), que é interpretado em UTC
+// e desloca o dia 1º para o mês anterior em fusos negativos (ex.: UTC-3).
+const toMonthKey = (year: number, month: number): string =>
+  `${year}-${String(month + 1).padStart(2, '0')}`;
+
+const sumByType = async (monthKey: string, type: 'income' | 'expense'): Promise<number> => {
+  const result = await prisma.transaction.aggregate({
+    _sum: { amount: true },
+    where: { type, date: { startsWith: monthKey } }
+  });
+  return result._sum.amount ?? 0;
+};
+
+const calculatePercentageChange = (current: number, previous: number): string => {
+  if (previous === 0) return current > 0 ? '+100%' : '0%';
+  // Math.abs mantém o sinal correto quando o valor anterior é negativo (prejuízo)
+  const change = ((current - previous) / Math.abs(previous)) * 100;
+  return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+};
+
 export const getDashboardStats = async (req: Request, res: Response): Promise<void> => {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
-  
+
   // Mês anterior
   const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  // Helper para verificar se uma data está em um mês específico
-  const isInMonth = (dateString: string, month: number, year: number) => {
-    const date = new Date(dateString);
-    return date.getMonth() === month && date.getFullYear() === year;
-  };
+  const currentMonthKey = toMonthKey(currentYear, currentMonth);
+  const lastMonthKey = toMonthKey(lastMonthYear, lastMonth);
 
-  // Buscar todas as transações
-  const transactions = await prisma.transaction.findMany();
-  
-  // Calcular receitas do mês atual e anterior
-  const currentMonthRevenue = transactions
-    .filter(t => t.type === 'income' && isInMonth(t.date, currentMonth, currentYear))
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  const lastMonthRevenue = transactions
-    .filter(t => t.type === 'income' && isInMonth(t.date, lastMonth, lastMonthYear))
-    .reduce((sum, t) => sum + t.amount, 0);
+  const [currentMonthIncome, currentMonthExpenses, lastMonthIncome, lastMonthExpenses] = await Promise.all([
+    sumByType(currentMonthKey, 'income'),
+    sumByType(currentMonthKey, 'expense'),
+    sumByType(lastMonthKey, 'income'),
+    sumByType(lastMonthKey, 'expense'),
+  ]);
 
-  // Calcular lucro do mês atual e anterior (receitas - despesas)
-  const currentMonthIncome = transactions
-    .filter(t => t.type === 'income' && isInMonth(t.date, currentMonth, currentYear))
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  const currentMonthExpenses = transactions
-    .filter(t => t.type === 'expense' && isInMonth(t.date, currentMonth, currentYear))
-    .reduce((sum, t) => sum + t.amount, 0);
-  
   const currentMonthProfit = currentMonthIncome - currentMonthExpenses;
-
-  const lastMonthIncome = transactions
-    .filter(t => t.type === 'income' && isInMonth(t.date, lastMonth, lastMonthYear))
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  const lastMonthExpenses = transactions
-    .filter(t => t.type === 'expense' && isInMonth(t.date, lastMonth, lastMonthYear))
-    .reduce((sum, t) => sum + t.amount, 0);
-  
   const lastMonthProfit = lastMonthIncome - lastMonthExpenses;
 
-  // Buscar clientes criados no último mês
-  const clients = await prisma.client.findMany();
-  const lastMonthClients = clients.filter(c => isInMonth(c.createdAt.toISOString(), lastMonth, lastMonthYear)).length;
-
-  // Buscar projetos criados no último mês
-  const projects = await prisma.project.findMany();
-  const lastMonthProjects = projects.filter(p => isInMonth(p.createdAt.toISOString(), lastMonth, lastMonthYear)).length;
-
-  // Calcular porcentagens de mudança
-  const calculatePercentageChange = (current: number, previous: number): string => {
-    if (previous === 0) return current > 0 ? '+100%' : '0%';
-    const change = ((current - previous) / previous) * 100;
-    return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+  // Clientes e projetos criados no último mês (intervalo no horário local do servidor)
+  const lastMonthRange = {
+    gte: new Date(lastMonthYear, lastMonth, 1),
+    lt: new Date(currentYear, currentMonth, 1),
   };
 
+  const [lastMonthClients, lastMonthProjects] = await Promise.all([
+    prisma.client.count({ where: { createdAt: lastMonthRange } }),
+    prisma.project.count({ where: { createdAt: lastMonthRange } }),
+  ]);
+
   const stats: DashboardStats = {
-    revenueChange: calculatePercentageChange(currentMonthRevenue, lastMonthRevenue),
+    revenueChange: calculatePercentageChange(currentMonthIncome, lastMonthIncome),
     projectsChange: `+${lastMonthProjects}`,
     clientsChange: `+${lastMonthClients}`,
     profitChange: calculatePercentageChange(currentMonthProfit, lastMonthProfit),

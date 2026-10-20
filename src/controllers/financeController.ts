@@ -5,7 +5,7 @@ import prisma from '../config/prisma';
 export const getFinancialSummary = async (req: Request, res: Response): Promise<void> => {
   const transactions = await prisma.transaction.findMany();
   const monthlyRevenue = await prisma.revenue.findMany({
-    orderBy: { month: 'asc' }
+    orderBy: [{ year: 'asc' }, { monthNumber: 'asc' }]
   });
 
   const totalRevenue = transactions
@@ -46,7 +46,7 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
 
 export const getRevenue = async (req: Request, res: Response): Promise<void> => {
   const revenue = await prisma.revenue.findMany({
-    orderBy: { month: 'asc' }
+    orderBy: [{ year: 'asc' }, { monthNumber: 'asc' }]
   });
 
   res.json(revenue.map(r => ({
