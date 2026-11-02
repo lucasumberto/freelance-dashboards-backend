@@ -1,4 +1,7 @@
-export type ClientStatus = 'active' | 'inactive';
+import { z } from 'zod';
+import { clientStatusSchema, createClientSchema, updateClientSchema } from '../schemas/client';
+
+export type ClientStatus = z.infer<typeof clientStatusSchema>;
 
 export interface Client {
   id: number;
@@ -12,20 +15,5 @@ export interface Client {
   lastContact: string;
 }
 
-export interface CreateClientDTO {
-  name: string;
-  email: string;
-  company?: string;
-  phone?: string;
-  status?: ClientStatus;
-  lastContact?: string;
-}
-
-export interface UpdateClientDTO {
-  name?: string;
-  email?: string;
-  company?: string;
-  phone?: string;
-  status?: ClientStatus;
-  lastContact?: string;
-}
+export type CreateClientDTO = z.infer<typeof createClientSchema>;
+export type UpdateClientDTO = z.infer<typeof updateClientSchema>;
